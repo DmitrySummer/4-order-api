@@ -1,0 +1,12 @@
+services:
+  postgres:
+    container_name: 4_order_api_postgres
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: order_api_postgres
+      POSTGRES_PASSWORD: order_api_pass
+      PGDATA: /data/order_api_postgres
+    volumes:
+      - ./order_api_postgres_postgres-data:/data/order_api_postgres
+    ports:
+      - "5432:5432"
