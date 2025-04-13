@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"4-order-api/internal/product"
+	"4-order-api/internal/user"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -22,7 +23,7 @@ func main() {
 		panic(err)
 	}
 
-	err = db.AutoMigrate(&product.Product{})
+	err = db.AutoMigrate(&product.Product{}, user.User{})
 	if err != nil {
 		fmt.Printf("Ошибка при выполнении миграции: %v\n", err)
 		panic(err)

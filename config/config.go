@@ -21,6 +21,11 @@ type Config struct {
 	UserHost     string
 	UserPort     string
 	Db           DbConfig
+	Auth         AuthConfig
+}
+
+type AuthConfig struct {
+	Secret string
 }
 
 func LoadConfig() *Config {
@@ -43,5 +48,8 @@ func LoadConfig() *Config {
 		UserHost:     os.Getenv("HOST"),
 		UserPort:     os.Getenv("PORT"),
 		Db:           dbConfig,
+		Auth: AuthConfig{
+			Secret: os.Getenv("SECRET"),
+		},
 	}
 }
