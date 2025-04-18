@@ -2,5 +2,5 @@ package auth
 
 const (
 	ErrUserExists       = "user exists"
-	ErrWrongCreatetials = "wrong phone or password"
+	ErrWrongCredentials = "wrong phone or password"
 )
