@@ -4,6 +4,7 @@ import (
 	"4-order-api/config"
 	"4-order-api/internal/auth"
 	"4-order-api/internal/handler"
+	"4-order-api/internal/user"
 	"4-order-api/pkg/db"
 	"context"
 	"fmt"
@@ -26,13 +27,24 @@ func main() {
 
 	router := http.NewServeMux()
 
+	userRepository := user.NewRepository(database.DB)
+	authService := auth.NewAuthService(userRepository)
+
 	auth.NewAuthHandler(router, auth.AuthHandlerDeps{
 		Config: conf,
 		DB:     database,
+		Auth:   authService,
 	})
 
 	handler.NewProductHandler(router, handler.ProductHandlerDeps{
-		DB: database,
+		Config:         conf,
+		DB:            database,
+		UserRepository: userRepository,
+	})
+
+	handler.NewUserHandler(router, handler.UserHandlerDeps{
+		DB:          database,
+		AuthService: authService,
 	})
 
 	server := &http.Server{
@@ -55,7 +67,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	fmt.Println("\nВыключелние сервера...")
+	fmt.Println("\nВыключение сервера...")
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("Сервер завершил работу: %v", err)
 	}
