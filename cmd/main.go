@@ -4,8 +4,10 @@ import (
 	"4-order-api/config"
 	"4-order-api/internal/auth"
 	"4-order-api/internal/handler"
+	"4-order-api/internal/order"
 	"4-order-api/internal/user"
 	"4-order-api/pkg/db"
+	"4-order-api/pkg/middleware"
 	"context"
 	"fmt"
 	"log"
@@ -21,7 +23,7 @@ func main() {
 
 	database, err := db.NewDb(conf)
 	if err != nil {
-		log.Fatalf("Ошибка инициализации базы данных: %v", err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
 
@@ -29,6 +31,7 @@ func main() {
 
 	userRepository := user.NewRepository(database.DB)
 	authService := auth.NewAuthService(userRepository)
+	authMiddleware := middleware.NewAuthMiddleware(conf, userRepository)
 
 	auth.NewAuthHandler(router, auth.AuthHandlerDeps{
 		Config: conf,
@@ -47,6 +50,9 @@ func main() {
 		AuthService: authService,
 	})
 
+	orderHandler := order.NewHandler(database.DB)
+	orderHandler.RegisterRoutes(router, authMiddleware)
+
 	server := &http.Server{
 		Addr:    ":8081",
 		Handler: router,
@@ -58,7 +64,7 @@ func main() {
 	go func() {
 		fmt.Println("Server listening on port 8081")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Сервер не запущен: %v", err)
+			log.Fatalf("Server failed to start: %v", err)
 		}
 	}()
 
@@ -67,10 +73,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	fmt.Println("\nВыключение сервера...")
+	fmt.Println("\nShutting down server...")
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Сервер завершил работу: %v", err)
+		log.Printf("Server shutdown error: %v", err)
 	}
 
-	fmt.Println("Сервер завершил работу правильно")
+	fmt.Println("Server gracefully stopped")
 }

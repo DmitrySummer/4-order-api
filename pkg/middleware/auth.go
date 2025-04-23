@@ -11,7 +11,10 @@ import (
 
 type contextKey string
 
-const UserContextKey contextKey = "user"
+const (
+	UserContextKey   contextKey = "user"
+	UserIDContextKey contextKey = "user_id"
+)
 
 type AuthMiddleware struct {
 	config         *config.Config
@@ -33,36 +36,32 @@ func GetUserFromContext(ctx context.Context) *user.User {
 	return user
 }
 
+func GetUserIDFromContext(ctx context.Context) uint {
+	userID, ok := ctx.Value(UserIDContextKey).(uint)
+	if !ok {
+		return 0
+	}
+	return userID
+}
+
 func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			http.Error(w, "Отсутствует токен авторизации", http.StatusUnauthorized)
+			http.Error(w, "missing authorization header", http.StatusUnauthorized)
 			return
 		}
 
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			http.Error(w, "Неверный формат токена", http.StatusUnauthorized)
-			return
-		}
+		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		jwtService := jwt.NewJwt(m.config.Auth.Secret)
-		valid, jwtData := jwtService.Parce(tokenParts[1])
-		if !valid || jwtData == nil {
-			http.Error(w, "Недействительный токен", http.StatusUnauthorized)
-			return
-		}
-
-		currentUser, err := m.userRepository.FindByPhone(jwtData.Phone)
+		userID, err := jwtService.ParseToken(token)
 		if err != nil {
-			http.Error(w, "Пользователь не найден", http.StatusUnauthorized)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserContextKey, currentUser)
-		r = r.WithContext(ctx)
-
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

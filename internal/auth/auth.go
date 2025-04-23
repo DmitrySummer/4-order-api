@@ -5,7 +5,7 @@ import (
 	"4-order-api/pkg/db"
 	"4-order-api/pkg/jwt"
 	"4-order-api/pkg/request"
-	resp "4-order-api/pkg/res"
+	"4-order-api/pkg/res"
 	"net/http"
 )
 
@@ -34,49 +34,52 @@ func NewAuthHandler(mux *http.ServeMux, deps AuthHandlerDeps) {
 
 func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Не допустимый метод", http.StatusMethodNotAllowed)
+		res.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	body, err := request.HandleBody[LoginRequest](&w, r)
 	if err != nil {
 		return
 	}
-	phone, err := h.auth.Login(body.Phone, body.Password)
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
+	userID, err := h.auth.Login(body.Phone, body.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		res.Error(w, http.StatusUnauthorized, err.Error())
+		return
 	}
-	data := LoginResponse{
-		Token: token,
-	}
-	resp.Json(w, data, 200)
 
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
+	if err != nil {
+		res.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	res.Success(w, LoginResponse{
+		Token: token,
+	})
 }
 
 func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Не допустимый метод", http.StatusMethodNotAllowed)
+		res.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	body, err := request.HandleBody[RegisterRequest](&w, r)
 	if err != nil {
 		return
 	}
-	phone, err := h.auth.Register(body.Phone, body.Name, body.Password)
+	userID, err := h.auth.Register(body.Phone, body.Name, body.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		res.Error(w, http.StatusUnauthorized, err.Error())
+		return
 	}
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	data := RegisterResponse{
-		Token: token,
-	}
-	resp.Json(w, data, 200)
 
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
+	if err != nil {
+		res.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	res.Success(w, RegisterResponse{
+		Token: token,
+	})
 }

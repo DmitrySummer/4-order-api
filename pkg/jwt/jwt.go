@@ -1,9 +1,14 @@
 package jwt
 
-import "github.com/golang-jwt/jwt/v5"
+import (
+	"errors"
 
-type JWTData struct {
-	Phone string
+	"github.com/golang-jwt/jwt/v5"
+)
+
+type Claims struct {
+	UserID uint `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
 type JWT struct {
@@ -16,26 +21,34 @@ func NewJwt(secret string) *JWT {
 	}
 }
 
-func (j *JWT) Create(data JWTData) (string, error) {
-	t := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-		"phone": data.Phone,
-	})
-	s, err := t.SignedString([]byte(j.Secret))
+func (j *JWT) CreateToken(userID uint) (string, error) {
+	claims := &Claims{
+		UserID: userID,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(j.Secret))
 	if err != nil {
 		return "", err
 	}
-	return s, nil
+
+	return tokenString, nil
 }
 
-func (j *JWT) Parce(token string) (bool, *JWTData) {
-	t, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+func (j *JWT) ParseToken(tokenString string) (uint, error) {
+	claims := &Claims{}
+
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.Secret), nil
 	})
+
 	if err != nil {
-		return false, nil
+		return 0, err
 	}
-	phone := t.Claims.(jwt.MapClaims)["phone"]
-	return t.Valid, &JWTData{
-		Phone: phone.(string),
+
+	if !token.Valid {
+		return 0, errors.New("invalid token")
 	}
+
+	return claims.UserID, nil
 }
