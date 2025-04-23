@@ -3,6 +3,7 @@ package auth
 import (
 	"4-order-api/internal/user"
 	"errors"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -16,13 +17,16 @@ func NewAuthService(userRepository *user.Repository) *AuthService {
 }
 
 func (service *AuthService) Login(phone, password string) (string, error) {
-	existedUser, _ := service.UserRepository.FindByPhone(phone)
-	if existedUser == nil {
-		return "", errors.New(ErrWrongCreatetials)
-	}
-	err := bcrypt.CompareHashAndPassword([]byte(existedUser.Password), []byte(password))
+	existedUser, err := service.UserRepository.FindByPhone(phone)
 	if err != nil {
-		return "", errors.New(ErrWrongCreatetials)
+		return "", fmt.Errorf("ошибка при поиске пользователя: %w", err)
+	}
+	if existedUser == nil {
+		return "", errors.New(ErrWrongCredentials)
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(existedUser.Password), []byte(password))
+	if err != nil {
+		return "", errors.New(ErrWrongCredentials)
 	}
 	return existedUser.Phone, nil
 }
