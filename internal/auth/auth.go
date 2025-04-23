@@ -39,21 +39,22 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := request.HandleBody[LoginRequest](&w, r)
 	if err != nil {
+		http.Error(w, "Невозможно обработать тело запроса: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	userID, err := h.auth.Login(body.Phone, body.Password)
+	phone, err := h.auth.Login(body.Phone, body.Password)
 	if err != nil {
-		res.Error(w, http.StatusUnauthorized, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
+	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
+		Phone: phone,
+	})
 	if err != nil {
-		res.Error(w, http.StatusInternalServerError, err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	res.Success(w, LoginResponse{
+	data := LoginResponse{
 		Token: token,
 	})
 }
@@ -65,21 +66,24 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := request.HandleBody[RegisterRequest](&w, r)
 	if err != nil {
+		http.Error(w, "Невозможно обработать тело запроса: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	userID, err := h.auth.Register(body.Phone, body.Name, body.Password)
 	if err != nil {
-		res.Error(w, http.StatusUnauthorized, err.Error())
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
-	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
-	if err != nil {
-		res.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	res.Success(w, RegisterResponse{
-		Token: token,
+	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
+		Phone: phone,
 	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data := RegisterResponse{
+		Token: token,
+	}
+	resp.Json(w, data, 200)
+
 }
