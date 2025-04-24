@@ -16,17 +16,17 @@ func NewAuthService(userRepository *user.Repository) *AuthService {
 	return &AuthService{UserRepository: userRepository}
 }
 
-func (service *AuthService) Login(phone, password string) (string, error) {
+func (service *AuthService) Login(phone, password string) (uint, error) {
 	existedUser, err := service.UserRepository.FindByPhone(phone)
 	if err != nil {
-		return "", fmt.Errorf("ошибка при поиске пользователя: %w", err)
+		return 0, fmt.Errorf("ошибка при поиске пользователя: %w", err)
 	}
 	if existedUser == nil {
-		return "", errors.New(ErrWrongCredentials)
+		return 0, errors.New(ErrWrongCredentials)
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(existedUser.Password), []byte(password))
 	if err != nil {
-		return "", errors.New(ErrWrongCredentials)
+		return 0, errors.New(ErrWrongCredentials)
 	}
 	return existedUser.ID, nil
 }

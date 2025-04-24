@@ -42,21 +42,21 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Невозможно обработать тело запроса: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	phone, err := h.auth.Login(body.Phone, body.Password)
+	userID, err := h.auth.Login(body.Phone, body.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	data := LoginResponse{
 		Token: token,
-	})
+	}
+	res.Json(w, data, http.StatusOK)
+
 }
 
 func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -74,9 +74,7 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -84,6 +82,6 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	data := RegisterResponse{
 		Token: token,
 	}
-	resp.Json(w, data, 200)
+	res.Json(w, data, http.StatusOK)
 
 }
