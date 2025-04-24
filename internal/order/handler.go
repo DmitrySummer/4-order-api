@@ -8,17 +8,16 @@ import (
 
 	"gorm.io/gorm"
 
-	"4-order-api/internal/product"
 	"4-order-api/pkg/middleware"
 	"4-order-api/pkg/res"
 )
 
 type Handler struct {
-	db *gorm.DB
+	repo *Repository
 }
 
 func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+	return &Handler{repo: NewRepository(db)}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth *middleware.AuthMiddleware) {
@@ -51,52 +50,40 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx := h.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
 	order := Order{
 		UserID: userID,
 		Status: "pending",
 	}
 
-	if err := tx.Create(&order).Error; err != nil {
-		tx.Rollback()
+	if err := h.repo.Create(&order); err != nil {
 		res.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	var totalPrice float64
 	for _, p := range input.Products {
-		var prod product.Product
-		if err := tx.First(&prod, p.ID).Error; err != nil {
-			tx.Rollback()
+		prod, err := h.repo.GetProduct(p.ID)
+		if err != nil {
 			res.Error(w, http.StatusNotFound, err.Error())
 			return
 		}
 
 		if prod.Stock < p.Quantity {
-			tx.Rollback()
 			res.Error(w, http.StatusBadRequest, "insufficient stock")
 			return
 		}
 
 		prod.Stock -= p.Quantity
-		if err := tx.Save(&prod).Error; err != nil {
-			tx.Rollback()
+		if err := h.repo.UpdateProduct(prod); err != nil {
 			res.Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 
-		if err := tx.Create(&OrderProduct{
+		if err := h.repo.CreateOrderProduct(&OrderProduct{
 			OrderID:   order.ID,
 			ProductID: prod.ID,
 			Quantity:  p.Quantity,
-		}).Error; err != nil {
-			tx.Rollback()
+		}); err != nil {
 			res.Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -105,14 +92,7 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order.TotalPrice = totalPrice
-	if err := tx.Save(&order).Error; err != nil {
-		tx.Rollback()
-		res.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		tx.Rollback()
+	if err := h.repo.Update(&order); err != nil {
 		res.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -139,8 +119,8 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var order Order
-	if err := h.db.Preload("Products").First(&order, orderID).Error; err != nil {
+	order, err := h.repo.GetByID(uint64(orderID))
+	if err != nil {
 		res.Error(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -165,8 +145,8 @@ func (h *Handler) GetMyOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var orders []Order
-	if err := h.db.Where("user_id = ?", userID).Preload("Products").Find(&orders).Error; err != nil {
+	orders, err := h.repo.GetByUserID(uint64(userID))
+	if err != nil {
 		res.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
