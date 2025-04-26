@@ -5,7 +5,7 @@ import (
 	"4-order-api/pkg/db"
 	"4-order-api/pkg/jwt"
 	"4-order-api/pkg/request"
-	resp "4-order-api/pkg/res"
+	"4-order-api/pkg/res"
 	"net/http"
 )
 
@@ -34,7 +34,7 @@ func NewAuthHandler(mux *http.ServeMux, deps AuthHandlerDeps) {
 
 func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Не допустимый метод", http.StatusMethodNotAllowed)
+		res.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	body, err := request.HandleBody[LoginRequest](&w, r)
@@ -42,14 +42,12 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Невозможно обработать тело запроса: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	phone, err := h.auth.Login(body.Phone, body.Password)
+	userID, err := h.auth.Login(body.Phone, body.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -57,13 +55,13 @@ func (h *AuthHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	data := LoginResponse{
 		Token: token,
 	}
-	resp.Json(w, data, 200)
+	res.Json(w, data, http.StatusOK)
 
 }
 
 func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Не допустимый метод", http.StatusMethodNotAllowed)
+		res.Error(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	body, err := request.HandleBody[RegisterRequest](&w, r)
@@ -71,14 +69,12 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Невозможно обработать тело запроса: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	phone, err := h.auth.Register(body.Phone, body.Name, body.Password)
+	userID, err := h.auth.Register(body.Phone, body.Name, body.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-	token, err := jwt.NewJwt(h.config.Auth.Secret).Create(jwt.JWTData{
-		Phone: phone,
-	})
+	token, err := jwt.NewJwt(h.config.Auth.Secret).CreateToken(userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -86,6 +82,6 @@ func (h *AuthHandler) handleRegister(w http.ResponseWriter, r *http.Request) {
 	data := RegisterResponse{
 		Token: token,
 	}
-	resp.Json(w, data, 200)
+	res.Json(w, data, http.StatusOK)
 
 }
